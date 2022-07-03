@@ -1,0 +1,51 @@
+name: Test go project
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  container-job:
+    runs-on: ubuntu-latest
+    container: golang:1.18
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: go mod tidy
+      
+      - name: Run build
+        run: go build .
+
+      - name: Connect to PostgreSQL
+        run: |
+          cd migrations
+          go run *.go init
+          go run *.go up 
+          cd ../
+          go test -p 1 ./services/...
+        env:
+          POSTGRES_HOST: postgres
+          POSTGRES_PORT: 5432
+          PHAROS_HOST: 0.0.0.0
+          PHAROS_PORT: 8000
+          PHAROS_DB_PORT: 5432
+          PHAROS_DB_HOST: postgres
+          PHAROS_DB_NAME: postgres
+          PHAROS_DB_USER: postgres
+          PHAROS_DB_PASSWORD: postgres
+          PHAROS_JWT_SECRET: jwtSecretGithub
